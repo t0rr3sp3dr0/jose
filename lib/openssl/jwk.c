@@ -363,7 +363,7 @@ jose_openssl_jwk_to_EC_KEY(jose_cfg_t *cfg, const json_t *jwk)
     const json_t *d = NULL;
     int nid = NID_undef;
 
-    if (json_unpack((json_t *) jwk, "{s:s,s:s,s:o,s:o,s?o}", "kty", &kty,
+    if (json_unpack((json_t *) jwk, "{s:s,s:s,s?o,s?o,s?o}", "kty", &kty,
                     "crv", &crv, "x", &x, "y", &y, "d", &d) == -1)
         return NULL;
 
@@ -404,3 +404,54 @@ jose_openssl_jwk_to_EC_KEY(jose_cfg_t *cfg, const json_t *jwk)
     return EC_KEY_up_ref(key) <= 0 ? NULL : key;
 }
 
+bool
+jose_openssl_jwk_flip_EC_Y(jose_cfg_t *cfg, json_t *jwk)
+{
+    const char *crv = NULL;
+    int nid = 0;
+    EC_GROUP *grp = NULL;
+    openssl_auto(BIGNUM) *p = NULL;
+    openssl_auto(BIGNUM) *y0 = NULL;
+    openssl_auto(BIGNUM) *y1 = NULL;
+    bool ret = false;
+    int len = 0;
+
+    if (json_unpack((json_t *) jwk, "{s:s}", "crv", &crv) < 0)
+        return ret;
+
+    switch (str2enum(crv, "P-256", "P-384", "P-521", "secp256k1", NULL)) {
+    case 0: nid = NID_X9_62_prime256v1; break;
+    case 1: nid = NID_secp384r1; break;
+    case 2: nid = NID_secp521r1; break;
+    case 3: nid = NID_secp256k1; break;
+    default: return ret;
+    }
+
+    grp = EC_GROUP_new_by_curve_name(nid);
+    if (!grp)
+        return ret;
+
+    p = BN_new();
+    if (!p || !EC_GROUP_get_curve_GFp(grp, p, NULL, NULL, NULL))
+        goto egress;
+
+    y0 = bn_decode_json(json_object_get(jwk, "y"));
+    if (!y0)
+        goto egress;
+
+    y1 = BN_new();
+    if (!y1 || !BN_sub(y1, p, y0))
+        goto egress;
+
+    len = (EC_GROUP_get_degree(grp) + 7) / 8;
+
+    if (json_object_set_new(jwk, "y", bn_encode_json(y1, len)) < 0)
+        goto egress;
+
+    ret = true;
+
+egress:
+    EC_GROUP_free(grp);
+
+    return ret;
+}

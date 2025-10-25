@@ -43,3 +43,6 @@ jose_openssl_jwk_to_RSA(jose_cfg_t *cfg, const json_t *jwk);
 
 EC_KEY *
 jose_openssl_jwk_to_EC_KEY(jose_cfg_t *cfg, const json_t *jwk);
+
+bool
+jose_openssl_jwk_flip_EC_Y(jose_cfg_t *cfg, json_t *jwk);

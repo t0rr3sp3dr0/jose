@@ -18,6 +18,7 @@
 #include <jose/cfg.h>
 #undef jose_cfg_err
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -109,7 +110,7 @@ jose_cfg_incref(jose_cfg_t *cfg)
 void
 jose_cfg_decref(jose_cfg_t *cfg)
 {
-    if (cfg->refs-- == 1)
+    if (cfg && cfg->refs-- == 1)
         jose_free(cfg);
 }
 

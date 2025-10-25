@@ -17,6 +17,7 @@
 
 #include <jose/b64.h>
 #include <jose/jwk.h>
+#include <jose/openssl.h>
 #include "hooks.h"
 #include "misc.h"
 #include "hsh.h"

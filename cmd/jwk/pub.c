@@ -16,6 +16,7 @@
  */
 
 #include "jwk.h"
+#include <jose/openssl.h>
 #include <unistd.h>
 
 #define SUMMARY "Cleans private keys from a JWK"
@@ -24,10 +25,16 @@ typedef struct {
     FILE *output;
     json_t *keys;
     bool set;
+    bool flip;
 } jcmd_opt_t;
 
 static const char *prefix =
-"jose jwk pub -i JWK [-s] [-o JWK]\n\n" SUMMARY;
+"jose jwk pub -i JWK [-s] [-f] [-o JWK]\n\n" SUMMARY;
+
+static const jcmd_doc_t doc_flip[] = {
+    { .doc="Flip Y coordinate of EC points in the JWK" },
+    {}
+};
 
 static const jcmd_cfg_t cfgs[] = {
     {
@@ -47,6 +54,12 @@ static const jcmd_cfg_t cfgs[] = {
         .opt = { "set", no_argument, .val = 's' },
         .off = offsetof(jcmd_opt_t, set),
         .doc = jcmd_jwk_doc_set,
+        .set = jcmd_opt_set_flag,
+    },
+    {
+        .opt = { "flip", no_argument, .val = 'f' },
+        .off = offsetof(jcmd_opt_t, flip),
+        .doc = doc_flip,
         .set = jcmd_opt_set_flag,
     },
     {}
@@ -69,10 +82,17 @@ jcmd_jwk_pub(int argc, char *argv[])
     if (!jcmd_opt_parse(argc, argv, cfgs, &opt, prefix))
         return EXIT_FAILURE;
 
-    for (size_t i = 0; !fail && i < json_array_size(opt.keys); i++)
-        fail |= !jose_jwk_pub(NULL, json_array_get(opt.keys, i));
+    for (size_t i = 0; !fail && i < json_array_size(opt.keys); i++) {
+        json_t *jwk = json_array_get(opt.keys, i);
+
+        fail |= !jose_jwk_pub(NULL, jwk);
+
+        if (opt.flip)
+            fail |= !jose_openssl_jwk_flip_EC_Y(NULL, jwk);
+    }
+
     if (fail) {
-        fprintf(stderr, "Error removing private keys!\n");
+        fprintf(stderr, "Error processing keys!\n");
         return EXIT_FAILURE;
     }
 
